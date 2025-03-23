@@ -1,7 +1,42 @@
 import argparse
+import yaml
+import signal
+import sys
+import os
+
+class TriggerHandler:
+    def __init__(self):
+        self.save_requested = False
+        self.sample_requested = False
+        
+        # Windows兼容的信号处理
+        if sys.platform == 'win32':
+            import win32api
+            win32api.SetConsoleCtrlHandler(self.win_handler, True)
+        else:
+            signal.signal(signal.SIGUSR1, self.handle_save_signal)
+            signal.signal(signal.SIGUSR2, self.handle_sample_signal)
+
+    def win_handler(self, sig):
+        if sig == 0:  # CTRL_BREAK_EVENT
+            self.save_requested = True
+        elif sig == 1:  # CTRL_C_EVENT
+            self.sample_requested = True
+        return True
+
+    def handle_save_signal(self, signum, frame):
+        self.save_requested = True
+
+    def handle_sample_signal(self, signum, frame):
+        self.sample_requested = True
+
+trigger_handler = TriggerHandler()
 
 def parse_opts():
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('--config', type=str,
+                      help='Path to configuration YAML file')
 
     ''' Overall Settings '''
     parser.add_argument('--root_path', type=str, default='./')
@@ -85,7 +120,28 @@ def parse_opts():
     parser.add_argument('--dump_fake_for_NIQE', action='store_true', default=False)
     parser.add_argument('--niqe_dump_path', type=str, default='None') 
 
-    args = parser.parse_args()
+    # 先解析已知参数（包括配置文件路径）
+    args, remaining_argv = parser.parse_known_args()
+
+    # 加载YAML配置
+    if args.config:
+        with open(args.config, 'r') as f:
+            config = yaml.safe_load(f)
+            
+            # 合并配置文件参数
+            for key, value in config.items():
+                # 处理嵌套字典（如训练参数）
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        setattr(args, f"{key}_{sub_key}", sub_value)
+                else:
+                    setattr(args, key, value)
+
+    # 重新解析命令行参数（覆盖配置文件设置）
+    args = parser.parse_args(remaining_argv, namespace=args)
+    
+    # 自动创建保存目录
+    os.makedirs(args.save_dir, exist_ok=True)
 
     return args
 

@@ -121,12 +121,31 @@ class Trainer(object):
         # step counter state
         self.step = 0
 
+        # trigger handler
+        from opts import TriggerHandler
+        self.trigger_handler = TriggerHandler()
+
         # prepare model, dataloader, optimizer with accelerator
         self.model, self.opt = self.accelerator.prepare(self.model, self.opt)
 
     @property
     def device(self):
         return self.accelerator.device
+
+    def _handle_save_signal(self):
+        if self.accelerator.is_main_process:
+            milestone = f"signal_{self.step}"
+            self.save(milestone)
+            print(f"\nTriggered save at step {self.step}")
+        self.trigger_handler.save_requested = False
+
+    def _handle_sample_signal(self):
+        if self.accelerator.is_main_process and hasattr(self, 'y_visual'):
+            with torch.inference_mode():
+                gen_imgs = self.ema.ema_model.ddim_sample(...)
+                utils.save_image(...)
+            print(f"\nTriggered sampling at step {self.step}")
+        self.trigger_handler.sample_requested = False
 
     def save(self, milestone):
         if not self.accelerator.is_local_main_process:
@@ -337,7 +356,14 @@ class Trainer(object):
                         milestone = self.step
                         self.ema.ema_model.eval()
                         self.save(milestone)
-
+                
+                # 信号触发保存
+                if self.trigger_handler.save_requested:
+                    self._handle_save_signal()
+                    
+                # 信号触发采样
+                if self.trigger_handler.sample_requested:
+                    self._handle_sample_signal()
                 pbar.update(1)
 
         accelerator.print('training complete')
