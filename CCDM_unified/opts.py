@@ -25,9 +25,11 @@ class TriggerHandler:
         return True
 
     def handle_save_signal(self, signum, frame):
+        print("Received save signal. Saving...")
         self.save_requested = True
 
     def handle_sample_signal(self, signum, frame):
+        print("Received sample signal. Sampling...")
         self.sample_requested = True
 
 trigger_handler = TriggerHandler()
@@ -141,7 +143,7 @@ def parse_opts():
     args = parser.parse_args(remaining_argv, namespace=args)
     
     # 自动创建保存目录
-    os.makedirs(args.save_dir, exist_ok=True)
+    # os.makedirs(args.save_dir, exist_ok=True)
 
     return args
 

@@ -27,7 +27,6 @@ from accelerate import Accelerator
 
 from ema_pytorch import EMA
 from utils import cycle, divisible_by, exists, normalize_images, random_hflip, random_rotate, random_vflip
-# from moviepy.editor import ImageSequenceClip
 
 
 class Trainer(object):
@@ -125,6 +124,9 @@ class Trainer(object):
         from opts import TriggerHandler
         self.trigger_handler = TriggerHandler()
 
+        # load latest checkpoint
+        self._load_latest_checkpoint()
+
         # prepare model, dataloader, optimizer with accelerator
         self.model, self.opt = self.accelerator.prepare(self.model, self.opt)
 
@@ -132,19 +134,48 @@ class Trainer(object):
     def device(self):
         return self.accelerator.device
 
+    def _load_latest_checkpoint(self):
+        """初始化时自动加载最新检查点"""
+        checkpoints = list(self.results_folder.glob('model-*.pt'))
+        if checkpoints:
+            # 提取所有检查点步数并找到最大值
+            try:
+                milestones = [int(p.stem.split('-')[-1]) for p in checkpoints]
+                latest_milestone = max(milestones)
+                self.load(latest_milestone)
+                print(f"Loaded checkpoint from step {latest_milestone}")
+            except Exception as e:
+                print(f"Error loading checkpoint: {str(e)}")
+
     def _handle_save_signal(self):
         if self.accelerator.is_main_process:
-            milestone = f"signal_{self.step}"
+            milestone = self.step
             self.save(milestone)
             print(f"\nTriggered save at step {self.step}")
         self.trigger_handler.save_requested = False
 
     def _handle_sample_signal(self):
-        if self.accelerator.is_main_process and hasattr(self, 'y_visual'):
-            with torch.inference_mode():
-                gen_imgs = self.ema.ema_model.ddim_sample(...)
-                utils.save_image(...)
-            print(f"\nTriggered sampling at step {self.step}")
+        """修复采样函数作用域问题"""
+        if self.accelerator.is_main_process and hasattr(self, 'fn_y2h') and self.y_visual is not None:
+            try:
+                self.ema.ema_model.eval()
+                with torch.inference_mode():
+                    gen_imgs = self.ema.ema_model.ddim_sample(
+                        labels_emb=self.fn_y2h(self.y_visual),
+                        labels=self.y_visual,
+                        shape=(self.y_visual.shape[0], self.channels, 
+                              self.image_size, self.image_size),
+                        cond_scale=self.cond_scale_visual
+                    )
+                    # 添加时间戳防止覆盖
+                    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    save_path = self.results_folder / f"trigger_sample_{self.step}_{timestamp}.png"
+                    utils.save_image(gen_imgs, str(save_path), nrow=self.nrow_visual)
+                    print(f"Saved triggered sample to {save_path}")
+            except Exception as e:
+                print(f"Sampling failed: {str(e)}")
+        else:
+            print("Sampling skipped: Required attributes not initialized")
         self.trigger_handler.sample_requested = False
 
     def save(self, milestone):
@@ -161,8 +192,6 @@ class Trainer(object):
         }
 
         torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
-        # torch.save(data, str(self.results_folder / f'model-{self.step}.pt'))
-
     def load(self, milestone, return_ema=False, return_unet=False):
         accelerator = self.accelerator
         device = accelerator.device
@@ -190,6 +219,7 @@ class Trainer(object):
 
     def train(self, fn_y2h):
         accelerator = self.accelerator
+        self.fn_y2h = fn_y2h
         device = accelerator.device
 
         log_filename = os.path.join(self.results_folder, 'log_loss_niters{}.txt'.format(self.train_num_steps))

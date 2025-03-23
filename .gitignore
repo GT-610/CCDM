@@ -176,3 +176,6 @@ cython_debug/
 # Model outputs and evals
 */output/
 evaluation/
+
+# datasets
+datasets/
