@@ -164,6 +164,22 @@ diffusion = GaussianDiffusion(
     ddim_sampling_eta = args.ddim_eta,
 ).cuda()
 
+# Add discriminator
+discriminator = None
+d_optimizer = None
+if args.use_discriminator:
+    from models.discriminator import Discriminator
+    discriminator = Discriminator(
+        in_channels=args.num_channels,
+        img_size=args.image_size,
+        ndf=args.ndf
+    ).cuda()
+    discriminator = nn.DataParallel(discriminator)
+    d_optimizer = torch.optim.Adam(
+        discriminator.parameters(),
+        lr=args.d_lr,
+        betas=(0.5, 0.999)
+    )
 
 
 ## for visualization
@@ -215,7 +231,14 @@ trainer = Trainer(
     max_grad_norm = 1.,
     y_visual = y_visual,
     nrow_visual = n_col,
-    cond_scale_visual=args.sample_cond_scale
+    cond_scale_visual=args.sample_cond_scale,
+
+    # Use discriminator
+    use_discriminator=args.use_discriminator,
+    discriminator=discriminator,
+    d_optimizer=d_optimizer,
+    d_loss_weight=args.d_loss_weight,
+
 )
 if args.resume_niter>0:
     trainer.load(args.resume_niter)

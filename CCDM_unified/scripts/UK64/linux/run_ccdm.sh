@@ -10,7 +10,8 @@ SETTING="Setup_CCDM"
 SIGMA=-1.0
 KAPPA=-1.0
 TYPE="hard"
-python main.py \
+
+python ${ROOT_PATH}/main.py \
     --setting_name $SETTING \
     --root_path $ROOT_PATH --data_name $DATA_NAME --data_path $DATA_PATH \
     --image_size $IMG_SIZE --train_amp \
@@ -24,5 +25,4 @@ python main.py \
     --sample_every 10000 --save_every 10000 \
     --sample_timesteps 250 --sample_cond_scale 1.5 \
     --sampler ddim --samp_batch_size 200 --nfake_per_label 1000 \
-    --dump_fake_data \
-    2>&1 | tee output_${DATA_NAME}_${IMG_SIZE}_${SETTING}.txt
+    --dump_fake_data

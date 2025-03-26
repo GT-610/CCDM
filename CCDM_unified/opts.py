@@ -68,6 +68,15 @@ def parse_opts():
     parser.add_argument('--attn_dim_head', type=int, default=32, metavar='N')
     parser.add_argument('--cond_drop_prob', type=float, default=0.1)
     
+    ''' GAN Discriminator '''
+    parser.add_argument('--use_discriminator', action='store_true', 
+                        help='是否启用GAN判别器模块，默认不启用')
+    parser.add_argument('--d_lr', type=float, default=1e-4, 
+                        help='判别器学习率')
+    parser.add_argument('--d_loss_weight', type=float, default=1.0,
+                        help='对抗损失权重')
+    parser.add_argument('--ndf', type=int, default=64,
+                        help='判别器基础通道数')
 
     ''' Training '''   
     ## Diffusion model

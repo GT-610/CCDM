@@ -40,6 +40,14 @@ class Trainer(object):
         *,
         train_batch_size = 16,
         gradient_accumulate_every = 1,
+
+        # ▼▼▼ 新增判别器参数 ▼▼▼
+        use_discriminator=False,
+        discriminator=None,
+        d_optimizer=None,
+        d_loss_weight=1.0,
+        # ▲▲▲ 新增参数结束 ▲▲▲
+
         train_lr = 1e-4,
         train_num_steps = 100000,
         ema_update_after_step = 1e30,
@@ -104,6 +112,15 @@ class Trainer(object):
         self.image_size = diffusion_model.image_size
 
         self.max_grad_norm = max_grad_norm
+
+        # ▼▼▼ 初始化判别器相关属性 ▼▼▼
+        self.use_discriminator = use_discriminator
+        if self.use_discriminator:
+            assert discriminator is not None and d_optimizer is not None
+            self.discriminator = discriminator
+            self.d_optimizer = d_optimizer
+            self.d_loss_weight = d_loss_weight
+        # ▲▲▲ 初始化结束 ▲▲▲
 
 
         # optimizer
@@ -334,6 +351,29 @@ class Trainer(object):
                     self.accelerator.backward(loss)
                 
                 ##end for
+
+                # === 新增判别器训练步骤 ===
+                if self.use_discriminator:
+                    # 生成假样本
+                    with torch.no_grad():
+                        fake_images = self.model.sample(...)
+                    
+                    # 判别器前向计算
+                    real_pred = self.discriminator(real_images)
+                    fake_pred = self.discriminator(fake_images.detach())
+                    
+                    # 计算对抗损失
+                    d_loss_real = F.binary_cross_entropy(real_pred, torch.ones_like(real_pred))
+                    d_loss_fake = F.binary_cross_entropy(fake_pred, torch.zeros_like(fake_pred))
+                    d_loss = (d_loss_real + d_loss_fake) * self.d_loss_weight
+                    
+                    # 反向传播更新判别器
+                    self.d_optimizer.zero_grad()
+                    self.accelerator.backward(d_loss)
+                    self.d_optimizer.step()
+                    
+                    # 将对抗损失加入总损失
+                    total_loss += d_loss.item()
 
                 accelerator.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                 pbar.set_description(f'loss: {total_loss:.4f}')
