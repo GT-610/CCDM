@@ -174,8 +174,8 @@ cython_debug/
 .pypirc
 
 # Model outputs and evals
-*/output/
+*/output/*
 evaluation/
 
 # datasets
-datasets/
+datasets/*
