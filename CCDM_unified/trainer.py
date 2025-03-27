@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import copy
+from datetime import datetime
 from pathlib import Path
 from random import random
 from functools import partial
@@ -27,7 +28,6 @@ from accelerate import Accelerator
 
 from ema_pytorch import EMA
 from utils import cycle, divisible_by, exists, normalize_images, random_hflip, random_rotate, random_vflip
-
 
 class Trainer(object):
     def __init__(
