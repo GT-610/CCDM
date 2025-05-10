@@ -164,12 +164,12 @@ diffusion = GaussianDiffusion(
     ddim_sampling_eta = args.ddim_eta,
 ).cuda()
 
-# Add discriminator
+## Add discriminator
 discriminator = None
 d_optimizer = None
 if args.use_discriminator:
-    from models.discriminator import Discriminator
-    discriminator = Discriminator(
+    from models.discriminator import SNPatchDiscriminator  # 修改：引入SNGAN的判别器
+    discriminator = SNPatchDiscriminator(
         in_channels=args.num_channels,
         img_size=args.image_size,
         ndf=args.ndf
