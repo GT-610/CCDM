@@ -25,7 +25,7 @@ nvidia-cudnn-cu12==9.5.1.17
 nvidia-cufft-cu12==11.3.0.4
 nvidia-curand-cu12==10.3.7.77
 nvidia-cusolver-cu12==11.7.1.2
-nvidia-cusparse-cu12 @ https://download.pytorch.org/whl/cu126/nvidia_cusparse_cu12-12.5.4.2-py3-none-manylinux2014_x86_64.whl#sha256=23749a6571191a215cb74d1cdbff4a86e7b19f1200c071b3fcf844a5bea23a2f
+nvidia-cusparse-cu12 @ https://mirrors.nju.edu.cn/pytorch/whl/cu126/nvidia_cusparse_cu12-12.5.4.2-py3-none-manylinux2014_x86_64.whl#sha256=23749a6571191a215cb74d1cdbff4a86e7b19f1200c071b3fcf844a5bea23a2f
 nvidia-cusparselt-cu12==0.6.3
 nvidia-nccl-cu12==2.21.5
 nvidia-nvjitlink-cu12==12.6.85

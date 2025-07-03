@@ -4,8 +4,8 @@
 # export CUDA_VISIBLE_DEVICES=0
 DATA_NAME="UTKFace"
 IMG_SIZE=64
-ROOT_PATH="/usr/src/CCDM_unified"
-DATA_PATH="/usr/src/datasets/UTKFace"
+ROOT_PATH="/root/src/CCDM_unified"
+DATA_PATH="/root/src/datasets/UTKFace"
 SETTING="Setup_CCDM"
 SIGMA=-1.0
 KAPPA=-1.0
@@ -25,4 +25,6 @@ python ${ROOT_PATH}/main.py \
     --sample_every 10000 --save_every 10000 \
     --sample_timesteps 250 --sample_cond_scale 1.5 \
     --sampler ddim --samp_batch_size 200 --nfake_per_label 1000 \
-    --dump_fake_data
+    --dump_fake_data \
+    --use_discriminator \
+    2>&1 | tee output_${DATA_NAME}_${IMG_SIZE}_${SETTING}_SNGAN.txt
