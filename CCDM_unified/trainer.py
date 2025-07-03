@@ -38,8 +38,8 @@ class Trainer(object):
         train_labels,
         vicinal_params,
         *,
-        train_batch_size = 16,
-        gradient_accumulate_every = 1,
+        train_batch_size=16,
+        gradient_accumulate_every=1,
 
         # ▼▼▼ 新增判别器参数 ▼▼▼
         use_discriminator=False,
@@ -48,21 +48,21 @@ class Trainer(object):
         d_loss_weight=1.0,
         # ▲▲▲ 新增参数结束 ▲▲▲
 
-        train_lr = 1e-4,
-        train_num_steps = 100000,
-        ema_update_after_step = 1e30,
-        ema_update_every = 10,
-        ema_decay = 0.995,
-        adam_betas = (0.9, 0.99),
-        sample_every = 1000,
-        save_every = 1000,
-        results_folder = './results',
-        amp = False,
-        mixed_precision_type = 'fp16',
-        split_batches = True,
-        max_grad_norm = 1.,
-        y_visual = None,
-        nrow_visual = 6,
+        train_lr=1e-4,
+        train_num_steps=100000,
+        ema_update_after_step=1e30,
+        ema_update_every=10,
+        ema_decay=0.995,
+        adam_betas=(0.9, 0.99),
+        sample_every=1000,
+        save_every=1000,
+        results_folder='./results',
+        amp=False,
+        mixed_precision_type='fp16',
+        split_batches=True,
+        max_grad_norm=1.,
+        y_visual=None,
+        nrow_visual=6,
         cond_scale_visual=1.5
     ):
         super().__init__()
@@ -73,8 +73,8 @@ class Trainer(object):
         self.train_images = train_images
         self.train_labels = train_labels
         self.unique_train_labels = np.sort(np.array(list(set(train_labels))))
-        assert train_images.max()>1.0
-        assert train_labels.min()>=0 and train_labels.max()<=1.0
+        assert train_images.max() > 1.0
+        assert train_labels.min() >= 0 and train_labels.max() <= 1.0
         print("\n Training labels' range is [{},{}].".format(train_labels.min(), train_labels.max()))
         
         # vicinal params
@@ -91,11 +91,11 @@ class Trainer(object):
         # accelerator
         self.accelerator = Accelerator(
             # split_batches = split_batches,
-            mixed_precision = mixed_precision_type if amp else 'no'
+            mixed_precision=mixed_precision_type if amp else 'no'
         )
 
         # model
-        self.model = diffusion_model ##diffusion model instead of unet
+        self.model = diffusion_model  ##diffusion model instead of unet
         self.channels = diffusion_model.channels
 
         # sampling and training hyperparameters
@@ -122,17 +122,19 @@ class Trainer(object):
             self.d_loss_weight = d_loss_weight
         # ▲▲▲ 初始化结束 ▲▲▲
 
+        # 新增：输出判别器启用状态
+        print(f"\n Discriminator is {'enabled' if self.use_discriminator else 'disabled'}.")
 
         # optimizer
-        self.opt = Adam(diffusion_model.parameters(), lr = train_lr, betas = adam_betas)
+        self.opt = Adam(diffusion_model.parameters(), lr=train_lr, betas=adam_betas)
 
         # for logging results in a folder periodically
         if self.accelerator.is_main_process:
-            self.ema = EMA(diffusion_model, update_after_step=ema_update_after_step, beta = ema_decay, update_every = ema_update_every)
+            self.ema = EMA(diffusion_model, update_after_step=ema_update_after_step, beta=ema_decay, update_every=ema_update_every)
             self.ema.to(self.device)
 
         self.results_folder = Path(results_folder)
-        self.results_folder.mkdir(exist_ok = True)
+        self.results_folder.mkdir(exist_ok=True)
 
         # step counter state
         self.step = 0
@@ -356,15 +358,21 @@ class Trainer(object):
                 if self.use_discriminator:
                     # 生成假样本
                     with torch.no_grad():
-                        fake_images = self.model.sample(...)
+                        fake_images = self.model.sample(
+                            labels_emb=self.fn_y2h(batch_labels),  # 当前批次的标签嵌入
+                            labels=batch_labels,                   # 原始标签
+                        ) # (labels_emb, labels, cond_scale=6.0, rescaled_phi=0.7)
+                    
+                    # 使用当前批次的真实图像作为真实样本
+                    real_images = batch_images
                     
                     # 判别器前向计算
                     real_pred = self.discriminator(real_images)
                     fake_pred = self.discriminator(fake_images.detach())
                     
                     # 计算对抗损失
-                    d_loss_real = F.binary_cross_entropy(real_pred, torch.ones_like(real_pred))
-                    d_loss_fake = F.binary_cross_entropy(fake_pred, torch.zeros_like(fake_pred))
+                    d_loss_real = F.binary_cross_entropy_with_logits(real_pred, torch.ones_like(real_pred))
+                    d_loss_fake = F.binary_cross_entropy_with_logits(fake_pred, torch.zeros_like(fake_pred))
                     d_loss = (d_loss_real + d_loss_fake) * self.d_loss_weight
                     
                     # 反向传播更新判别器
