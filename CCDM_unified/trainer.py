@@ -40,13 +40,14 @@ class Trainer(object):
         *,
         train_batch_size=16,
         gradient_accumulate_every=1,
-
-        # ▼▼▼ 新增判别器参数 ▼▼▼
+        
+        # === 判别器参数 ===
         use_discriminator=False,
         discriminator=None,
         d_optimizer=None,
         d_loss_weight=1.0,
-        # ▲▲▲ 新增参数结束 ▲▲▲
+        d_update_freq=1,  # 更新频率
+        # =================
 
         train_lr=1e-4,
         train_num_steps=100000,
@@ -120,10 +121,12 @@ class Trainer(object):
             self.discriminator = discriminator
             self.d_optimizer = d_optimizer
             self.d_loss_weight = d_loss_weight
-        # ▲▲▲ 初始化结束 ▲▲▲
+            self.d_update_freq = d_update_freq  # 保存判别器更新频率
 
-        # 新增：输出判别器启用状态
+        # 输出判别器启用状态及更新频率
         print(f"\n Discriminator is {'enabled' if self.use_discriminator else 'disabled'}.")
+        if self.use_discriminator:
+            print(f" Discriminator update frequency: every {self.d_update_freq} steps")
 
         # optimizer
         self.opt = Adam(diffusion_model.parameters(), lr=train_lr, betas=adam_betas)
@@ -174,7 +177,6 @@ class Trainer(object):
         self.trigger_handler.save_requested = False
 
     def _handle_sample_signal(self):
-        """修复采样函数作用域问题"""
         if self.accelerator.is_main_process and hasattr(self, 'fn_y2h') and self.y_visual is not None:
             try:
                 self.ema.ema_model.eval()
@@ -251,9 +253,9 @@ class Trainer(object):
         with tqdm(initial = self.step, total = self.train_num_steps, disable = not accelerator.is_main_process) as pbar:
 
             while self.step < self.train_num_steps:
-
+                
                 total_loss = 0.
-
+                
                 for _ in range(self.gradient_accumulate_every):
 
                     ## for no vicinity
@@ -354,8 +356,8 @@ class Trainer(object):
                 
                 ##end for
 
-                # === 新增判别器训练步骤 ===
-                if self.use_discriminator:
+                # 判别器训练 - 仅在满足更新频率时执行
+                if self.use_discriminator and (self.step % self.d_update_freq == 0):
                     # 生成假样本
                     with torch.no_grad():
                         fake_images = self.model.sample(
@@ -382,6 +384,10 @@ class Trainer(object):
                     
                     # 将对抗损失加入总损失
                     total_loss += d_loss.item()
+                    pbar.set_description(f'loss: {total_loss:.4f} (D updated)')
+                elif self.use_discriminator:
+                    # 非更新步骤，只记录信息
+                    pbar.set_description(f'loss: {total_loss:.4f} (D skip)')
 
                 accelerator.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                 pbar.set_description(f'loss: {total_loss:.4f}')

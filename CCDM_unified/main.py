@@ -208,6 +208,9 @@ vicinal_params = {
     "nonzero_soft_weight_threshold": args.nonzero_soft_weight_threshold,
 }
 
+# 判别器更新频率参数
+d_update_freq = getattr(args, 'd_update_freq', 100)
+
 trainer = Trainer(
     data_name=args.data_name,
     diffusion_model=diffusion,
@@ -238,7 +241,7 @@ trainer = Trainer(
     discriminator=discriminator,
     d_optimizer=d_optimizer,
     d_loss_weight=args.d_loss_weight,
-
+    d_update_freq=d_update_freq,  # 判别器更新频率参数
 )
 if args.resume_niter>0:
     trainer.load(args.resume_niter)
