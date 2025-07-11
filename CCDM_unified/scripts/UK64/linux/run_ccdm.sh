@@ -1,7 +1,7 @@
 #!/bin/bash
 # export NCCL_P2P_DISABLE=1
 # export NCCL_IB_DISABLE=1
-# export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=2
 DATA_NAME="UTKFace"
 IMG_SIZE=64
 ROOT_PATH="/root/src/CCDM_unified"
